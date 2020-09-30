@@ -41,16 +41,16 @@ architecture rtl of pentagon_video is
 	constant pcpm_brd_left		: natural :=  64;	-- 32 для выравнивания из-за задержки на чтение vid_reg и attr_reg задано на 8 точек меньше
 
 	constant pcpm_scr_v			: natural := 192;
-	constant pcpm_brd_bot		: natural :=  16;--16
+	constant pcpm_brd_bot		: natural :=  48;--16
 	constant pcpm_blk_down		: natural :=  8;--8
 	constant pcpm_sync_v			: natural :=  16;--16
-	constant pcpm_blk_up			: natural :=  16;--16
-	constant pcpm_brd_top		: natural :=  16;--16
+	constant pcpm_blk_up			: natural :=  8;--16
+	constant pcpm_brd_top		: natural :=  48;--16
 	
-	constant pcpm_brd_bot_60	: natural :=  1;--16
-	constant pcpm_blk_down_60	: natural :=  1;--8
-	constant pcpm_sync_v_60		: natural :=  5;--16
-	constant pcpm_blk_up_60		: natural :=  1;--16
+	constant pcpm_brd_bot_60	: natural :=  16;--16
+	constant pcpm_blk_down_60	: natural :=  12;--8
+	constant pcpm_sync_v_60		: natural :=  12;--16
+	constant pcpm_blk_up_60		: natural :=  8;--16
 	constant pcpm_brd_top_60	: natural :=  16;--16
 
 	constant pcpm_h_blk_on		: natural := (pcpm_scr_h + pcpm_brd_right) - 1;
@@ -70,10 +70,10 @@ architecture rtl of pentagon_video is
 	constant pcpm_v_blk_off_60	: natural := (pcpm_scr_v + pcpm_brd_bot_60 + pcpm_blk_down_60 + pcpm_sync_v_60 + pcpm_blk_up_60);
 	constant pcpm_v_end_60		: natural := 263;
 
-	constant pcpm_h_int_on		: natural := 656; --pspec_sync_h+8;
-	constant pcpm_v_int_on		: natural := 241; --pspec_v_blk_off - 1;
-	constant pcpm_h_int_off		: natural := 128;
-	constant pcpm_v_int_off		: natural := 256;
+	constant pcpm_h_int_on		: natural := 316; --pspec_sync_h+8;
+	constant pcpm_v_int_on		: natural := 239; --pspec_v_blk_off - 1;
+	constant pcpm_h_int_off		: natural := 388;
+	constant pcpm_v_int_off		: natural := 241;
 
 -- INT  Y303,X752  - Y304,X128
 

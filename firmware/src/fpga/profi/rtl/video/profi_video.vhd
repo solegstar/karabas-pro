@@ -25,6 +25,7 @@ entity profi_video is
 		HCNT 		: out std_logic_vector(9 downto 0);
 		VCNT 		: out std_logic_vector(8 downto 0);	
 		DS80 		: in std_logic;
+		MODE60	: in std_logic;
 		VBUS_MODE : in std_logic := '0';
 		VID_RD : in std_logic
 	);
@@ -45,6 +46,12 @@ architecture rtl of profi_video is
 	constant pcpm_sync_v			: natural :=  16;--16
 	constant pcpm_blk_up			: natural :=  16;--16
 	constant pcpm_brd_top		: natural :=  16;--16
+	
+	constant pcpm_brd_bot_60	: natural :=  1;--16
+	constant pcpm_blk_down_60	: natural :=  1;--8
+	constant pcpm_sync_v_60		: natural :=  5;--16
+	constant pcpm_blk_up_60		: natural :=  1;--16
+	constant pcpm_brd_top_60	: natural :=  16;--16
 
 	constant pcpm_h_blk_on		: natural := (pcpm_scr_h + pcpm_brd_right) - 1;
 	constant pcpm_h_sync_on		: natural := (pcpm_scr_h + pcpm_brd_right + pcpm_blk_front) - 1;
@@ -57,6 +64,11 @@ architecture rtl of profi_video is
 	constant pcpm_v_sync_off	: natural := (pcpm_scr_v + pcpm_brd_bot + pcpm_blk_down + pcpm_sync_v);
 	constant pcpm_v_blk_off		: natural := (pcpm_scr_v + pcpm_brd_bot + pcpm_blk_down + pcpm_sync_v + pcpm_blk_up);
 	constant pcpm_v_end			: natural := 311;
+	constant pcpm_v_blk_on_60	: natural := (pcpm_scr_v + pcpm_brd_bot_60) - 1;
+	constant pcpm_v_sync_on_60	: natural := (pcpm_scr_v + pcpm_brd_bot_60 + pcpm_blk_down_60) - 1;
+	constant pcpm_v_sync_off_60: natural := (pcpm_scr_v + pcpm_brd_bot_60 + pcpm_blk_down_60 + pcpm_sync_v_60);
+	constant pcpm_v_blk_off_60	: natural := (pcpm_scr_v + pcpm_brd_bot_60 + pcpm_blk_down_60 + pcpm_sync_v_60 + pcpm_blk_up_60);
+	constant pcpm_v_end_60		: natural := 263;
 
 	constant pcpm_h_int_on		: natural := 656; --pspec_sync_h+8;
 	constant pcpm_v_int_on		: natural := 241; --pspec_v_blk_off - 1;
@@ -103,13 +115,8 @@ begin
 				end if;
 			
 				if (h_cnt = pcpm_h_sync_on) then
-<<<<<<< Updated upstream
-					if (v_cnt = pcpm_v_end) then
-						v_cnt <= (others => '0');
-=======
 					if (v_cnt(9 downto 1) = pcpm_v_end and mode60 = '0') or (v_cnt(9 downto 1) = pcpm_v_end_60 and mode60 = '1') then
 						v_cnt(9 downto 1) <= (others => '0');
->>>>>>> Stashed changes
 					else
 						v_cnt <= v_cnt + 1;
 					end if;
@@ -119,15 +126,9 @@ begin
 				else
 					scan_cnt1 <= scan_cnt1 + 1;
 				end if;
-<<<<<<< Updated upstream
-				if (v_cnt = pcpm_v_sync_on) then
-					v_sync <= '0';
-				elsif (v_cnt = pcpm_v_sync_off) then
-=======
 				if (v_cnt(9 downto 1) = pcpm_v_sync_on and mode60 = '0') or (v_cnt(9 downto 1) = pcpm_v_sync_on_60 and mode60 = '1') then
 					v_sync <= '0';
 				elsif (v_cnt(9 downto 1) = pcpm_v_sync_off and mode60 = '0') or (v_cnt(9 downto 1) = pcpm_v_sync_off_60 and mode60 = '1') then
->>>>>>> Stashed changes
 					v_sync <= '1';
 				end if;
 
@@ -137,6 +138,7 @@ begin
 					h_sync <= '1';
 				end if;
 
+				
 				if (h_cnt > pcpm_h_int_on  and v_cnt(9 downto 1) = pcpm_v_int_on) then -- or (h_cnt < pcpm_h_int_off and v_cnt = pcpm_v_int_off) then
 					int_sig <= '0'; else	int_sig <= '1';
 				end if;				
@@ -162,9 +164,7 @@ process( CLK2X, CLK, h_cnt )
 -- memory read
 process(CLK2X, CLK, ENA, h_cnt, VBUS_MODE, VID_RD)
 begin
---	if CLK2X'event and CLK2X='1' then 
---		if (CLK = '0' and h_cnt(2 downto 0) < 7) then -- 12 mhz falling edge
-	if CLK2X'event and CLK2X='1' then 
+	if CLK2X'event and CLK2X='0' then 
 		if (h_cnt(2 downto 0) < 7) then -- 12 mhz falling edge
 			if (VBUS_MODE = '1') then
 				if VID_RD = '0' then 
@@ -200,13 +200,8 @@ i78 <= attr_reg(7) when ds80 = '1' else attr_reg(6);
 --A <= std_logic_vector((not h_cnt(3)) & v_cnt(7 downto 6)) & std_logic_vector(v_cnt(2 downto 0)) & std_logic_vector(v_cnt(5 downto 3)) & std_logic_vector(h_cnt(8 downto 4));
 A <= std_logic_vector((not h_cnt(3)) & v_cnt(8 downto 7)) & std_logic_vector(v_cnt(3 downto 1)) & std_logic_vector(v_cnt(6 downto 4)) & std_logic_vector(h_cnt(8 downto 4));
 		
-<<<<<<< Updated upstream
-blank_sig	<= '1' when (((h_cnt > pcpm_h_blk_on and h_cnt < pcpm_h_blk_off) or (v_cnt > pcpm_v_blk_on and v_cnt < pcpm_v_blk_off))) else '0';
-paper			<= '1' when ((h_cnt < pcpm_scr_h and v_cnt < pcpm_scr_v)) else '0';
-=======
 blank_sig	<= '1' when (((h_cnt > pcpm_h_blk_on and h_cnt < pcpm_h_blk_off) or ((v_cnt(9 downto 1) > pcpm_v_blk_on and v_cnt(9 downto 1) < pcpm_v_blk_off and mode60 = '0') or (v_cnt(9 downto 1) > pcpm_v_blk_on_60 and v_cnt(9 downto 1) < pcpm_v_blk_off_60 and mode60 = '1')))) else '0';
 paper			<= '1' when ((h_cnt < pcpm_scr_h and v_cnt(9 downto 1) < pcpm_scr_v)) else '0';
->>>>>>> Stashed changes
 
 INT			<= int_sig;
 bl_int 		<= int_sig;

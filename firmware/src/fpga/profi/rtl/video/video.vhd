@@ -136,6 +136,7 @@ begin
 		INT => int_profi,
 		A => vid_a_profi,
 		DS80 => DS80,
+		MODE60 => palette_en,
 
 		RGB => rgb_profi,
 		I 	 => i_profi,
