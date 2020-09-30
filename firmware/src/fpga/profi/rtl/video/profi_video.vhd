@@ -68,7 +68,7 @@ architecture rtl of profi_video is
 ---------------------------------------------------------------------------------------	
 
 	signal h_cnt			: unsigned(9 downto 0) := (others => '0');
-	signal v_cnt			: unsigned(8 downto 0) := (others => '0');
+	signal v_cnt			: unsigned(9 downto 0) := (others => '0');
 	signal paper			: std_logic;
 	signal paper1			: std_logic;
 	signal flash			: unsigned(4 downto 0) := (others => '0');
@@ -95,7 +95,7 @@ begin
 process (CLK2X, CLK)
 begin
 	if (CLK2X'event and CLK2X = '1') then
-			if (CLK = '1') then		-- 12MHz			
+--			if (CLK = '1') then		-- 12MHz			
 				if (h_cnt = pcpm_h_end) then
 					h_cnt <= (others => '0');
 				else
@@ -103,8 +103,13 @@ begin
 				end if;
 			
 				if (h_cnt = pcpm_h_sync_on) then
+<<<<<<< Updated upstream
 					if (v_cnt = pcpm_v_end) then
 						v_cnt <= (others => '0');
+=======
+					if (v_cnt(9 downto 1) = pcpm_v_end and mode60 = '0') or (v_cnt(9 downto 1) = pcpm_v_end_60 and mode60 = '1') then
+						v_cnt(9 downto 1) <= (others => '0');
+>>>>>>> Stashed changes
 					else
 						v_cnt <= v_cnt + 1;
 					end if;
@@ -114,9 +119,15 @@ begin
 				else
 					scan_cnt1 <= scan_cnt1 + 1;
 				end if;
+<<<<<<< Updated upstream
 				if (v_cnt = pcpm_v_sync_on) then
 					v_sync <= '0';
 				elsif (v_cnt = pcpm_v_sync_off) then
+=======
+				if (v_cnt(9 downto 1) = pcpm_v_sync_on and mode60 = '0') or (v_cnt(9 downto 1) = pcpm_v_sync_on_60 and mode60 = '1') then
+					v_sync <= '0';
+				elsif (v_cnt(9 downto 1) = pcpm_v_sync_off and mode60 = '0') or (v_cnt(9 downto 1) = pcpm_v_sync_off_60 and mode60 = '1') then
+>>>>>>> Stashed changes
 					v_sync <= '1';
 				end if;
 
@@ -126,11 +137,10 @@ begin
 					h_sync <= '1';
 				end if;
 
-				
-				if (h_cnt > pcpm_h_int_on  and v_cnt = pcpm_v_int_on) then -- or (h_cnt < pcpm_h_int_off and v_cnt = pcpm_v_int_off) then
+				if (h_cnt > pcpm_h_int_on  and v_cnt(9 downto 1) = pcpm_v_int_on) then -- or (h_cnt < pcpm_h_int_off and v_cnt = pcpm_v_int_off) then
 					int_sig <= '0'; else	int_sig <= '1';
 				end if;				
-			end if;
+--			end if;
 	end if;
 end process;
 
@@ -138,22 +148,24 @@ end process;
 process( CLK2X, CLK, h_cnt )
 	begin
 		if CLK2X'event and CLK2X = '1' then
-			if CLK = '1' then
+--			if CLK = '1' then
 				if h_cnt(2 downto 0) = 7 then
 					pixel_reg <= vid_reg;
 					attr_reg <= at_reg;
 					paper1 <= paper;
 					blank1 <= blank_sig;
 				end if;
-			end if;
+--			end if;
 		end if;
 	end process;
 
 -- memory read
 process(CLK2X, CLK, ENA, h_cnt, VBUS_MODE, VID_RD)
 begin
+--	if CLK2X'event and CLK2X='1' then 
+--		if (CLK = '0' and h_cnt(2 downto 0) < 7) then -- 12 mhz falling edge
 	if CLK2X'event and CLK2X='1' then 
-		if (CLK = '0' and h_cnt(2 downto 0) < 7) then -- 12 mhz falling edge
+		if (h_cnt(2 downto 0) < 7) then -- 12 mhz falling edge
 			if (VBUS_MODE = '1') then
 				if VID_RD = '0' then 
 					vid_reg <= DI;
@@ -168,7 +180,7 @@ end process;
 process (CLK2X, CLK, blank_sig, paper1, pixel_reg, h_cnt, attr_reg, BORDER)
 begin 
 	if CLK2X'event and CLK2X='1' then 
-		if CLK = '1' then
+--		if CLK = '1' then
 			if (blank1 = '1') then 
 				rgbi <= "0000";
 			elsif paper1 = '1' and (pixel_reg(7 - to_integer(h_cnt(2 downto 0)))) = '0' then 
@@ -179,16 +191,22 @@ begin
 				rgbi <= not BORDER(1) & not BORDER(2) & not BORDER(0) & '0';
 				--rgbi <= BORDER(1) & BORDER(2) & BORDER(0) & '0';
 			end if;
-		end if;
+--		end if;
 	end if;
 end process;
 
 i78 <= attr_reg(7) when ds80 = '1' else attr_reg(6);
 		
-A <= std_logic_vector((not h_cnt(3)) & v_cnt(7 downto 6)) & std_logic_vector(v_cnt(2 downto 0)) & std_logic_vector(v_cnt(5 downto 3)) & std_logic_vector(h_cnt(8 downto 4));		
+--A <= std_logic_vector((not h_cnt(3)) & v_cnt(7 downto 6)) & std_logic_vector(v_cnt(2 downto 0)) & std_logic_vector(v_cnt(5 downto 3)) & std_logic_vector(h_cnt(8 downto 4));
+A <= std_logic_vector((not h_cnt(3)) & v_cnt(8 downto 7)) & std_logic_vector(v_cnt(3 downto 1)) & std_logic_vector(v_cnt(6 downto 4)) & std_logic_vector(h_cnt(8 downto 4));
 		
+<<<<<<< Updated upstream
 blank_sig	<= '1' when (((h_cnt > pcpm_h_blk_on and h_cnt < pcpm_h_blk_off) or (v_cnt > pcpm_v_blk_on and v_cnt < pcpm_v_blk_off))) else '0';
 paper			<= '1' when ((h_cnt < pcpm_scr_h and v_cnt < pcpm_scr_v)) else '0';
+=======
+blank_sig	<= '1' when (((h_cnt > pcpm_h_blk_on and h_cnt < pcpm_h_blk_off) or ((v_cnt(9 downto 1) > pcpm_v_blk_on and v_cnt(9 downto 1) < pcpm_v_blk_off and mode60 = '0') or (v_cnt(9 downto 1) > pcpm_v_blk_on_60 and v_cnt(9 downto 1) < pcpm_v_blk_off_60 and mode60 = '1')))) else '0';
+paper			<= '1' when ((h_cnt < pcpm_scr_h and v_cnt(9 downto 1) < pcpm_scr_v)) else '0';
+>>>>>>> Stashed changes
 
 INT			<= int_sig;
 bl_int 		<= int_sig;
@@ -197,7 +215,7 @@ I 				<= rgbi(0);
 HSYNC 		<= h_sync;
 VSYNC 		<= v_sync;
 HCNT <= std_logic_vector(h_cnt);
-VCNT <= std_logic_vector(v_cnt);
+VCNT <= std_logic_vector(v_cnt(9 downto 1));
 BLANK <= blank1;
 
 end architecture;

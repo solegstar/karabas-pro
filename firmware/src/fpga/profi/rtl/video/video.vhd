@@ -95,20 +95,22 @@ architecture rtl of video is
 begin
 
 	U_PENT: entity work.pentagon_video 
-	generic map (
-		enable_turbo => enable_turbo
-	)
+--	generic map (
+--		enable_turbo => enable_turbo
+--	)
 	port map (
 		CLK => CLK, -- 14
-		CLK2x => CLK2x, -- 28
+--		CLK2x => CLK2x, -- 28
+		CLK2x => CLK, -- 28
 		ENA => ENA, -- 7
 		BORDER => BORDER(2 downto 0),
 		DI => DI,
-		TURBO => TURBO,
+--		TURBO => TURBO,
 		INTA => INTA,
 		INT => int_spec,
 		ATTR_O => ATTR_O, 
 		A => vid_a_spec,
+		MODE60 => palette_en,
 
 		RGB => rgb_spec,
 		I 	 => i_spec,
