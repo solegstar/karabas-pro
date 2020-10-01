@@ -34,24 +34,24 @@ end entity;
 architecture rtl of profi_video is
 -- Profi-CPM screen mode
 	constant pcpm_scr_h			: natural := 512;
-	constant pcpm_brd_right		: natural :=  48;	-- 32 для выравнивания из-за задержки на чтение vid_reg и attr_reg задано на 8 точек больше
+	constant pcpm_brd_right		: natural :=  64;	-- 32 для выравнивания из-за задержки на чтение vid_reg и attr_reg задано на 8 точек больше
 	constant pcpm_blk_front		: natural :=  32; -- 48
 	constant pcpm_sync_h			: natural :=  64; -- 64
 	constant pcpm_blk_back		: natural :=  64; -- 80
-	constant pcpm_brd_left		: natural :=  48;	-- 32 для выравнивания из-за задержки на чтение vid_reg и attr_reg задано на 8 точек меньше
+	constant pcpm_brd_left		: natural :=  32;	-- 32 для выравнивания из-за задержки на чтение vid_reg и attr_reg задано на 8 точек меньше
 
 	constant pcpm_scr_v			: natural := 240;
-	constant pcpm_brd_bot		: natural :=  16;--16
-	constant pcpm_blk_down		: natural :=  8;--8
+	constant pcpm_brd_bot		: natural :=  0;--16
+	constant pcpm_blk_down		: natural :=  24;--8
 	constant pcpm_sync_v			: natural :=  16;--16
-	constant pcpm_blk_up			: natural :=  16;--16
-	constant pcpm_brd_top		: natural :=  16;--16
+	constant pcpm_blk_up			: natural :=  32;--16
+	constant pcpm_brd_top		: natural :=  0;--16
 	
-	constant pcpm_brd_bot_60	: natural :=  1;--16
-	constant pcpm_blk_down_60	: natural :=  1;--8
-	constant pcpm_sync_v_60		: natural :=  5;--16
-	constant pcpm_blk_up_60		: natural :=  1;--16
-	constant pcpm_brd_top_60	: natural :=  16;--16
+	constant pcpm_brd_bot_60	: natural :=  0;--16
+	constant pcpm_blk_down_60	: natural :=  8;--8
+	constant pcpm_sync_v_60		: natural :=  8;--16
+	constant pcpm_blk_up_60		: natural :=  8;--16
+	constant pcpm_brd_top_60	: natural :=  0;--16
 
 	constant pcpm_h_blk_on		: natural := (pcpm_scr_h + pcpm_brd_right) - 1;
 	constant pcpm_h_sync_on		: natural := (pcpm_scr_h + pcpm_brd_right + pcpm_blk_front) - 1;
@@ -188,15 +188,25 @@ begin
 			elsif paper1 = '1' and (pixel_reg(7 - to_integer(h_cnt(2 downto 0)))) = '1' then 
 				rgbi <= attr_reg(1) & attr_reg(2) & attr_reg(0) & attr_reg(6);
 			else
-				rgbi <= not BORDER(1) & not BORDER(2) & not BORDER(0) & '0';
-				--rgbi <= BORDER(1) & BORDER(2) & BORDER(0) & '0';
+				rgbi <= not BORDER(1) & not BORDER(2) & not BORDER(0) & (not BORDER(3) and bl_int);
 			end if;
 --		end if;
 	end if;
 end process;
 
 i78 <= attr_reg(7) when ds80 = '1' else attr_reg(6);
-		
+
+process( INTA, CLK2X, h_cnt, int_sig )
+	begin
+		if CLK2X'event and CLK2X= '1' then
+			if INTA = '0' then
+				bl_int <= '1';
+			elsif h_cnt(4)= '1' then
+				bl_int <= not int_sig;
+			end if;
+		end if;
+	end process;
+
 --A <= std_logic_vector((not h_cnt(3)) & v_cnt(7 downto 6)) & std_logic_vector(v_cnt(2 downto 0)) & std_logic_vector(v_cnt(5 downto 3)) & std_logic_vector(h_cnt(8 downto 4));
 A <= std_logic_vector((not h_cnt(3)) & v_cnt(8 downto 7)) & std_logic_vector(v_cnt(3 downto 1)) & std_logic_vector(v_cnt(6 downto 4)) & std_logic_vector(h_cnt(8 downto 4));
 		
@@ -204,7 +214,6 @@ blank_sig	<= '1' when (((h_cnt > pcpm_h_blk_on and h_cnt < pcpm_h_blk_off) or ((
 paper			<= '1' when ((h_cnt < pcpm_scr_h and v_cnt(9 downto 1) < pcpm_scr_v)) else '0';
 
 INT			<= int_sig;
-bl_int 		<= int_sig;
 RGB 			<= rgbi(3 downto 1);
 I 				<= rgbi(0);
 HSYNC 		<= h_sync;
