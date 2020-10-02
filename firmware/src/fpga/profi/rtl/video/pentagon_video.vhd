@@ -45,11 +45,11 @@ architecture rtl of pentagon_video is
 	constant pcpm_brd_left		: natural :=  64;	-- 32 для выравнивания из-за задержки на чтение vid_reg и attr_reg задано на 8 точек меньше
 
 	constant pcpm_scr_v			: natural := 192;
-	constant pcpm_brd_bot		: natural :=  48;--16
-	constant pcpm_blk_down		: natural :=  0;--8
+	constant pcpm_brd_bot		: natural :=  40;--16
+	constant pcpm_blk_down		: natural :=  8;--8
 	constant pcpm_sync_v			: natural :=  16;--16
-	constant pcpm_blk_up			: natural :=  0;--16
-	constant pcpm_brd_top		: natural :=  64;--16
+	constant pcpm_blk_up			: natural :=  8;--16
+	constant pcpm_brd_top		: natural :=  56;--16
 	
 	constant pcpm_brd_bot_60	: natural :=  16;--16
 	constant pcpm_blk_down_60	: natural :=  12;--8
@@ -87,7 +87,7 @@ architecture rtl of pentagon_video is
 	signal v_cnt			: unsigned(9 downto 0) := (others => '0');
 	signal paper			: std_logic;
 	signal paper1			: std_logic;
-	signal flash			: unsigned(4 downto 0) := (others => '0');
+	signal flash			: std_logic_vector(4 downto 0) := "00000";
 	signal vid_reg			: std_logic_vector(7 downto 0);
 	signal pixel_reg		: std_logic_vector(7 downto 0);
 	signal at_reg			: std_logic_vector(7 downto 0);	
@@ -124,11 +124,13 @@ begin
 						v_cnt <= v_cnt + 1;
 					end if;
 				end if;
+				
 				if (h_cnt = pcpm_h_sync_on) then
 					scan_cnt1 <= (others => '0');
 				else
 					scan_cnt1 <= scan_cnt1 + 1;
 				end if;
+				
 				if (v_cnt(9 downto 1) = pcpm_v_sync_on and mode60 = '0') or (v_cnt(9 downto 1) = pcpm_v_sync_on_60 and mode60 = '1') then
 					v_sync <= '0';
 				elsif (v_cnt(9 downto 1) = pcpm_v_sync_off and mode60 = '0') or (v_cnt(9 downto 1) = pcpm_v_sync_off_60 and mode60 = '1') then
@@ -197,15 +199,17 @@ begin
 	end if;
 end process;
 
-process (CLK2X, CLK, blank_sig, paper1, pixel_reg, h_cnt, attr_reg, BORDER)
+flash <= (flash + 1) when (v_cnt(9)'event and v_cnt(9)='0');
+
+process (CLK2X, CLK, blank_sig, paper1, pixel_reg, h_cnt, attr_reg, BORDER, flash)
 begin 
 	if CLK2X'event and CLK2X='1' then 
 		if CLK = '1' then
 			if (blank1 = '1') then 
 				rgbi <= "0000";
-			elsif paper1 = '1' and (pixel_reg(7 - to_integer(h_cnt(2 downto 0)))) = '0' then 
+			elsif paper1 = '1' and (pixel_reg(7 - to_integer(h_cnt(2 downto 0))) xor (flash(4) and attr_reg(7))) = '0' then 
 				rgbi <= attr_reg(4) & attr_reg(5) & attr_reg(3) & attr_reg(6);
-			elsif paper1 = '1' and (pixel_reg(7 - to_integer(h_cnt(2 downto 0)))) = '1' then 
+			elsif paper1 = '1' and (pixel_reg(7 - to_integer(h_cnt(2 downto 0))) xor (flash(4) and attr_reg(7))) = '1' then 
 				rgbi <= attr_reg(1) & attr_reg(2) & attr_reg(0) & attr_reg(6);
 			else
 				rgbi <= BORDER(1) & BORDER(2) & BORDER(0) & '0';
