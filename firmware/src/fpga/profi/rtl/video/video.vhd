@@ -95,17 +95,17 @@ architecture rtl of video is
 begin
 
 	U_PENT: entity work.pentagon_video 
---	generic map (
---		enable_turbo => enable_turbo
---	)
+	generic map (
+		enable_turbo => enable_turbo
+	)
 	port map (
 		CLK => CLK, -- 14
---		CLK2x => CLK2x, -- 28
-		CLK2x => CLK, -- 28
+		CLK2x => CLK2x, -- 28
+--		CLK2x => CLK, -- 28
 		ENA => ENA, -- 7
 		BORDER => BORDER(2 downto 0),
 		DI => DI,
---		TURBO => TURBO,
+		TURBO => TURBO,
 		INTA => INTA,
 		INT => int_spec,
 		ATTR_O => ATTR_O, 
@@ -203,7 +203,7 @@ begin
 	GX0 <= palette_grb(6);
 	
 	-- применяем blank для профи, ибо в видеоконтроллере он после палитры
-	process(CLK2x, CLK, blank_profi, palette_grb) 
+	process(CLK2x, CLK, blank_profi, palette_grb, ds80) 
 	begin 
 		if (blank_profi = '1' and ds80='1') then
 			palette_grb_reg <= (others => '0');

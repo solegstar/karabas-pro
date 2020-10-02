@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- VIDEO Profi CP/M mode
+-- VIDEO Spectrum mode
 -------------------------------------------------------------------------------
 
 library IEEE; 
@@ -8,11 +8,15 @@ use IEEE.numeric_std.ALL;
 use IEEE.std_logic_unsigned.all;
 
 entity pentagon_video is
+	generic (
+		enable_turbo	: boolean := true
+	);
 	port (
-		CLK2X		: in std_logic; -- 24
-		CLK		: in std_logic; -- 12					
-		ENA		: in std_logic; -- 6
+		CLK2X		: in std_logic; -- 28
+		CLK		: in std_logic; -- 14					
+		ENA		: in std_logic; -- 7
 		INTA		: in std_logic;
+		TURBO		: in std_logic;
 		INT		: out std_logic;
 		BORDER	: in std_logic_vector(2 downto 0);	
 		A			: out std_logic_vector(13 downto 0);
@@ -32,7 +36,7 @@ entity pentagon_video is
 end entity;
 
 architecture rtl of pentagon_video is
--- Profi-CPM screen mode
+-- Spectrum screen mode
 	constant pcpm_scr_h			: natural := 256;
 	constant pcpm_brd_right		: natural :=  64;	-- 32 для выравнивания из-за задержки на чтение vid_reg и attr_reg задано на 8 точек больше
 	constant pcpm_blk_front		: natural :=  16; -- 48
@@ -42,10 +46,10 @@ architecture rtl of pentagon_video is
 
 	constant pcpm_scr_v			: natural := 192;
 	constant pcpm_brd_bot		: natural :=  48;--16
-	constant pcpm_blk_down		: natural :=  8;--8
+	constant pcpm_blk_down		: natural :=  0;--8
 	constant pcpm_sync_v			: natural :=  16;--16
-	constant pcpm_blk_up			: natural :=  8;--16
-	constant pcpm_brd_top		: natural :=  48;--16
+	constant pcpm_blk_up			: natural :=  0;--16
+	constant pcpm_brd_top		: natural :=  64;--16
 	
 	constant pcpm_brd_bot_60	: natural :=  16;--16
 	constant pcpm_blk_down_60	: natural :=  12;--8
@@ -63,23 +67,23 @@ architecture rtl of pentagon_video is
 	constant pcpm_v_sync_on		: natural := (pcpm_scr_v + pcpm_brd_bot + pcpm_blk_down) - 1;
 	constant pcpm_v_sync_off	: natural := (pcpm_scr_v + pcpm_brd_bot + pcpm_blk_down + pcpm_sync_v);
 	constant pcpm_v_blk_off		: natural := (pcpm_scr_v + pcpm_brd_bot + pcpm_blk_down + pcpm_sync_v + pcpm_blk_up);
-	constant pcpm_v_end			: natural := 319;
+	constant pcpm_v_end			: natural := 319;	-- 319 = Pentagon; -- 311 = Spectrum; 50HZ
 	constant pcpm_v_blk_on_60	: natural := (pcpm_scr_v + pcpm_brd_bot_60) - 1;
 	constant pcpm_v_sync_on_60	: natural := (pcpm_scr_v + pcpm_brd_bot_60 + pcpm_blk_down_60) - 1;
 	constant pcpm_v_sync_off_60: natural := (pcpm_scr_v + pcpm_brd_bot_60 + pcpm_blk_down_60 + pcpm_sync_v_60);
 	constant pcpm_v_blk_off_60	: natural := (pcpm_scr_v + pcpm_brd_bot_60 + pcpm_blk_down_60 + pcpm_sync_v_60 + pcpm_blk_up_60);
-	constant pcpm_v_end_60		: natural := 263;
+	constant pcpm_v_end_60		: natural := 263;	-- 60Hz
 
-	constant pcpm_h_int_on		: natural := 316; --pspec_sync_h+8;
+	constant pcpm_h_int_on		: natural := 318; --pspec_sync_h+8;
 	constant pcpm_v_int_on		: natural := 239; --pspec_v_blk_off - 1;
-	constant pcpm_h_int_off		: natural := 388;
-	constant pcpm_v_int_off		: natural := 241;
+	constant pcpm_h_int_off		: natural := 383;
+	constant pcpm_v_int_off		: natural := 247;
 
 -- INT  Y303,X752  - Y304,X128
 
 ---------------------------------------------------------------------------------------	
 
-	signal h_cnt			: unsigned(9 downto 0) := (others => '0');
+	signal h_cnt			: unsigned(8 downto 0) := (others => '0');
 	signal v_cnt			: unsigned(9 downto 0) := (others => '0');
 	signal paper			: std_logic;
 	signal paper1			: std_logic;
@@ -106,7 +110,7 @@ begin
 process (CLK2X, CLK)
 begin
 	if (CLK2X'event and CLK2X = '1') then
---			if (CLK = '1') then		-- 12MHz			
+			if (CLK = '1') then		-- 14MHz			
 				if (h_cnt = pcpm_h_end) then
 					h_cnt <= (others => '0');
 				else
@@ -136,11 +140,26 @@ begin
 				elsif (h_cnt = pcpm_h_sync_off) then
 					h_sync <= '1';
 				end if;
-
-				if (h_cnt > pcpm_h_int_on  and v_cnt(9 downto 1) = pcpm_v_int_on) then -- or (h_cnt < pcpm_h_int_off and v_cnt = pcpm_v_int_off) then
-					int_sig <= '0'; else	int_sig <= '1';
-				end if;				
---			end if;
+				
+				-- int
+				if enable_turbo and TURBO = '1' then
+					-- TURBO int
+					if h_cnt = pcpm_h_int_on and v_cnt(9 downto 1) = pcpm_v_int_on and v_cnt(0) = '0' then
+						int_sig <= '0';
+					elsif INTA = '0' then
+						int_sig <= '1';
+					end if;
+				else 
+					-- PENTAGON int
+					if h_cnt(5 downto 0) = "111110" then
+						if v_cnt(9 downto 1) = pcpm_v_int_on and v_cnt(0) = '0' and h_cnt(8 downto 6) = "100" then
+							int_sig <= '0';
+						else
+							int_sig <= '1';
+						end if;
+					end if;
+				end if;
+			end if;
 	end if;
 end process;
 
@@ -148,24 +167,24 @@ end process;
 process( CLK2X, CLK, h_cnt )
 	begin
 		if CLK2X'event and CLK2X = '1' then
---			if CLK = '1' then
+			if CLK = '1' then
 				if h_cnt(2 downto 0) = 7 then
 					pixel_reg <= vid_reg;
 					attr_reg <= at_reg;
 					paper1 <= paper;
 					blank1 <= blank_sig;
 				end if;
---			end if;
+			end if;
 		end if;
 	end process;
 
 -- memory read
 process(CLK2X, CLK, ENA, h_cnt, VBUS_MODE, VID_RD)
 begin
---	if CLK2X'event and CLK2X='1' then 
---		if (CLK = '0' and h_cnt(2 downto 0) < 7) then -- 12 mhz falling edge
 	if CLK2X'event and CLK2X='1' then 
-		if (h_cnt(2 downto 0) < 7) then -- 12 mhz falling edge
+		if (CLK = '0' and h_cnt(2 downto 0) < 7) then -- 14 mhz falling edge
+--	if CLK2X'event and CLK2X='1' then 
+		if (h_cnt(2 downto 0) < 7) then -- 14 mhz falling edge
 			if (VBUS_MODE = '1') then
 				if VID_RD = '0' then 
 					vid_reg <= DI;
@@ -174,13 +193,14 @@ begin
 				end if;
 			end if;				
 		end if;
+		end if;
 	end if;
 end process;
 
 process (CLK2X, CLK, blank_sig, paper1, pixel_reg, h_cnt, attr_reg, BORDER)
 begin 
 	if CLK2X'event and CLK2X='1' then 
---		if CLK = '1' then
+		if CLK = '1' then
 			if (blank1 = '1') then 
 				rgbi <= "0000";
 			elsif paper1 = '1' and (pixel_reg(7 - to_integer(h_cnt(2 downto 0)))) = '0' then 
@@ -188,15 +208,11 @@ begin
 			elsif paper1 = '1' and (pixel_reg(7 - to_integer(h_cnt(2 downto 0)))) = '1' then 
 				rgbi <= attr_reg(1) & attr_reg(2) & attr_reg(0) & attr_reg(6);
 			else
---				rgbi <= not BORDER(1) & not BORDER(2) & not BORDER(0) & '0';
 				rgbi <= BORDER(1) & BORDER(2) & BORDER(0) & '0';
 			end if;
---		end if;
+		end if;
 	end if;
 end process;
-
---A <= std_logic_vector((not h_cnt(3)) & v_cnt(7 downto 6)) & std_logic_vector(v_cnt(2 downto 0)) & std_logic_vector(v_cnt(5 downto 3)) & std_logic_vector(h_cnt(8 downto 4));
---A <= std_logic_vector((not h_cnt(3)) & v_cnt(8 downto 7)) & std_logic_vector(v_cnt(3 downto 1)) & std_logic_vector(v_cnt(6 downto 4)) & std_logic_vector(h_cnt(8 downto 4));
 
 	A <= 
 		-- data address
@@ -214,7 +230,7 @@ RGB 			<= rgbi(3 downto 1);
 I 				<= rgbi(0);
 HSYNC 		<= h_sync;
 VSYNC 		<= v_sync;
-HCNT <= std_logic_vector(h_cnt);
+HCNT <= '0' & std_logic_vector(h_cnt);
 VCNT <= std_logic_vector(v_cnt(9 downto 1));
 BLANK <= blank1;
 
