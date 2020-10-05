@@ -101,6 +101,7 @@ begin
 	port map (
 		CLK => CLK, -- 14
 		CLK2x => CLK2x, -- 28
+--		CLK2x => CLK, -- 28
 		ENA => ENA, -- 7
 		BORDER => BORDER(2 downto 0),
 		DI => DI,
@@ -109,6 +110,7 @@ begin
 		INT => int_spec,
 		ATTR_O => ATTR_O, 
 		A => vid_a_spec,
+		MODE60 => palette_en,
 
 		RGB => rgb_spec,
 		I 	 => i_spec,
@@ -134,6 +136,7 @@ begin
 		INT => int_profi,
 		A => vid_a_profi,
 		DS80 => DS80,
+		MODE60 => palette_en,
 
 		RGB => rgb_profi,
 		I 	 => i_profi,
@@ -200,7 +203,7 @@ begin
 	GX0 <= palette_grb(6);
 	
 	-- применяем blank для профи, ибо в видеоконтроллере он после палитры
-	process(CLK2x, CLK, blank_profi, palette_grb) 
+	process(CLK2x, CLK, blank_profi, palette_grb, ds80) 
 	begin 
 		if (blank_profi = '1' and ds80='1') then
 			palette_grb_reg <= (others => '0');

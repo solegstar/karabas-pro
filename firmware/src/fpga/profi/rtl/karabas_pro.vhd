@@ -542,22 +542,22 @@ vid_rgb_osd <= vid_rgb;
 --	CLK2 				=> vga_clk_2x,
 --	CLK_x2			=> vga_clko_2x);
 	
-U8: entity work.vga_pal 
-port map (
-	RGB_IN 			=> vid_rgb_osd,
-	KSI_IN 			=> vid_vsync,
-	SSI_IN 			=> vid_hsync,
-	CLK 				=> clk_div2,
-	CLK2 				=> clk_bus,
-	EN 				=> vid_scandoubler_enable,
-	DS80				=> ds80,
-		
-	RGB_O(8 downto 6)	=> VGA_R,
-	RGB_O(5 downto 3)	=> VGA_G,
-	RGB_O(2 downto 0)	=> VGA_B,
-	VSYNC_VGA		=> VGA_VS,
-	HSYNC_VGA		=> VGA_HS
-);
+--U8: entity work.vga_pal 
+--port map (
+--	RGB_IN 			=> vid_rgb_osd,
+--	KSI_IN 			=> vid_vsync,
+--	SSI_IN 			=> vid_hsync,
+--	CLK 				=> clk_div2,
+--	CLK2 				=> clk_bus,
+--	EN 				=> vid_scandoubler_enable,
+--	DS80				=> ds80,
+--		
+--	RGB_O(8 downto 6)	=> VGA_R,
+--	RGB_O(5 downto 3)	=> VGA_G,
+--	RGB_O(2 downto 0)	=> VGA_B,
+--	VSYNC_VGA		=> VGA_VS,
+--	HSYNC_VGA		=> VGA_HS
+--);
 
 -- Loader
 U9: entity work.loader
@@ -1054,13 +1054,13 @@ selector <=
 --PIN_119 <= cpu_int_n;
 --PIN_115 <= VGA_VS;
 
---PIN_141 <= cpuclk;  -- CH8
---PIN_138 <= serial_ms_do_bus(4);  -- CH7
---PIN_121 <= serial_ms_do_bus(5);  -- CH6 / d bit5
---PIN_120 <= serial_ms_do_bus(6);  -- CH5 / d bit6
---PIN_119 <= serial_ms_debug4(5);	-- CH4 / read from VV51
---PIN_115 <= serial_ms_debug2(1); 	-- CH3 / RxRDY status
+-- временно включаем-выключаем палитру по кнопке ScrollLock. Потом сделаем включенной постоянно
+palette_en <= not kb_turbo;
 
-palette_en <= '1'; 
+VGA_R <= vid_rgb(8 downto 6);
+VGA_G <= vid_rgb(5 downto 3);
+VGA_B <= vid_rgb(2 downto 0);
+VGA_VS <= vid_vsync;
+VGA_HS <= vid_hsync;
 	
 end rtl;
