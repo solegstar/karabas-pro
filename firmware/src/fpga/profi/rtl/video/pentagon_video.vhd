@@ -76,8 +76,8 @@ architecture rtl of pentagon_video is
 
 	constant pcpm_h_int_on		: natural := 318; --pspec_sync_h+8;
 	constant pcpm_v_int_on		: natural := 239; --pspec_v_blk_off - 1;
-	constant pcpm_h_int_off		: natural := 383;
-	constant pcpm_v_int_off		: natural := 247;
+	constant pcpm_h_int_off		: natural := 24;
+	constant pcpm_v_int_off		: natural := 239;
 
 -- INT  Y303,X752  - Y304,X128
 
@@ -119,7 +119,7 @@ begin
 			
 				if (h_cnt = pcpm_h_sync_on) then
 					if (v_cnt(9 downto 1) = pcpm_v_end and mode60 = '0') or (v_cnt(9 downto 1) = pcpm_v_end_60 and mode60 = '1') then
-						v_cnt(9 downto 1) <= (others => '0');
+						v_cnt <= (others => '0');
 					else
 						v_cnt <= v_cnt + 1;
 					end if;
@@ -144,41 +144,33 @@ begin
 				end if;
 				
 				-- int
-				if enable_turbo and TURBO = '1' then
-					-- TURBO int
-					if h_cnt = pcpm_h_int_on and v_cnt(9 downto 1) = pcpm_v_int_on and v_cnt(0) = '0' then
-						int_sig <= '0';
-					elsif INTA = '0' then
-						int_sig <= '1';
-					end if;
-				else 
-					-- PENTAGON int
-					if h_cnt(5 downto 0) = "111110" then
-						if v_cnt(9 downto 1) = pcpm_v_int_on and v_cnt(0) = '0' and h_cnt(8 downto 6) = "100" then
-							int_sig <= '0';
-						else
-							int_sig <= '1';
-						end if;
-					end if;
+--				if enable_turbo and TURBO = '1' then
+--					-- TURBO int
+--					if h_cnt = pcpm_h_int_on and v_cnt(9 downto 1) = pcpm_v_int_on and v_cnt(0) = '0' then
+--						int_sig <= '0';
+--					elsif INTA = '0' then
+--						int_sig <= '1';
+--					end if;
+--				else 
+--					-- PENTAGON int
+--					if h_cnt(5 downto 0) = "111110" then
+--						if v_cnt(9 downto 1) = pcpm_v_int_on and v_cnt(0) = '0' and h_cnt(8 downto 6) = "100" then
+--							int_sig <= '0';
+--						else
+--							int_sig <= '1';
+--						end if;
+--					end if;
+--				end if;
+				--Int
+				if (h_cnt = pcpm_h_int_on  and v_cnt(9 downto 1) = pcpm_v_int_on and v_cnt(0) = '0') then
+					int_sig <= '0';
+				elsif (h_cnt = pcpm_h_int_off and v_cnt(9 downto 1) = pcpm_v_int_off and v_cnt(0) = '1') then
+					int_sig <= '1';
 				end if;
+
 			end if;
 	end if;
 end process;
-
--- pixel / attr registers
-process( CLK2X, CLK, h_cnt )
-	begin
-		if CLK2X'event and CLK2X = '1' then
-			if CLK = '1' then
-				if h_cnt(2 downto 0) = 7 then
-					pixel_reg <= vid_reg;
-					attr_reg <= at_reg;
-					paper1 <= paper;
-					blank1 <= blank_sig;
-				end if;
-			end if;
-		end if;
-	end process;
 
 -- memory read
 process(CLK2X, CLK, ENA, h_cnt, VBUS_MODE, VID_RD)
@@ -198,6 +190,21 @@ begin
 		end if;
 	end if;
 end process;
+
+-- pixel / attr registers
+process( CLK2X, CLK, h_cnt )
+	begin
+		if CLK2X'event and CLK2X = '1' then
+			if CLK = '1' then
+				if h_cnt(2 downto 0) = 7 then
+					pixel_reg <= vid_reg;
+					attr_reg <= at_reg;
+					paper1 <= paper;
+					blank1 <= blank_sig;
+				end if;
+			end if;
+		end if;
+	end process;
 
 flash <= (flash + 1) when (v_cnt(9)'event and v_cnt(9)='0');
 

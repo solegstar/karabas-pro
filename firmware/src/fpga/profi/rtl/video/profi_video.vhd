@@ -73,7 +73,7 @@ architecture rtl of profi_video is
 	constant pcpm_h_int_on		: natural := 656; --pspec_sync_h+8;
 	constant pcpm_v_int_on		: natural := 241; --pspec_v_blk_off - 1;
 	constant pcpm_h_int_off		: natural := 128;
-	constant pcpm_v_int_off		: natural := 256;
+	constant pcpm_v_int_off		: natural := 241;
 
 -- INT  Y303,X752  - Y304,X128
 
@@ -116,7 +116,7 @@ begin
 			
 				if (h_cnt = pcpm_h_sync_on) then
 					if (v_cnt(9 downto 1) = pcpm_v_end and mode60 = '0') or (v_cnt(9 downto 1) = pcpm_v_end_60 and mode60 = '1') then
-						v_cnt(9 downto 1) <= (others => '0');
+						v_cnt <= (others => '0');
 					else
 						v_cnt <= v_cnt + 1;
 					end if;
@@ -138,11 +138,36 @@ begin
 					h_sync <= '1';
 				end if;
 
-				
-				if (h_cnt > pcpm_h_int_on  and v_cnt(9 downto 1) = pcpm_v_int_on) then -- or (h_cnt < pcpm_h_int_off and v_cnt = pcpm_v_int_off) then
-					int_sig <= '0'; else	int_sig <= '1';
-				end if;				
+				--Int
+				if (h_cnt = pcpm_h_int_on  and v_cnt(9 downto 1) = pcpm_v_int_on and v_cnt(0) = '0') then
+					int_sig <= '0';
+				elsif (h_cnt = pcpm_h_int_off and v_cnt(9 downto 1) = pcpm_v_int_off and v_cnt(0) = '0') then
+					int_sig <= '1';
+				end if;
+
+				--BL_INT
+				if INTA = '0' then
+					bl_int <= '1';
+				elsif h_cnt(4)= '1' then
+					bl_int <= not int_sig;
+				end if;
 --			end if;
+	end if;
+end process;
+
+-- memory read
+process(CLK2X, CLK, ENA, h_cnt, VBUS_MODE, VID_RD)
+begin
+	if CLK2X'event and CLK2X='0' then 
+		if (h_cnt(2 downto 0) < 7) then -- 12 mhz falling edge
+			if (VBUS_MODE = '1') then
+				if VID_RD = '0' then 
+					vid_reg <= DI;
+				else 
+					at_reg <= DI;
+				end if;
+			end if;				
+		end if;
 	end if;
 end process;
 
@@ -161,21 +186,7 @@ process( CLK2X, CLK, h_cnt )
 		end if;
 	end process;
 
--- memory read
-process(CLK2X, CLK, ENA, h_cnt, VBUS_MODE, VID_RD)
-begin
-	if CLK2X'event and CLK2X='0' then 
-		if (h_cnt(2 downto 0) < 7) then -- 12 mhz falling edge
-			if (VBUS_MODE = '1') then
-				if VID_RD = '0' then 
-					vid_reg <= DI;
-				else 
-					at_reg <= DI;
-				end if;
-			end if;				
-		end if;
-	end if;
-end process;
+i78 <= attr_reg(7) when ds80 = '1' else attr_reg(6);
 
 process (CLK2X, CLK, blank_sig, paper1, pixel_reg, h_cnt, attr_reg, BORDER)
 begin 
@@ -193,19 +204,6 @@ begin
 --		end if;
 	end if;
 end process;
-
-i78 <= attr_reg(7) when ds80 = '1' else attr_reg(6);
-
-process( INTA, CLK2X, h_cnt, int_sig )
-	begin
-		if CLK2X'event and CLK2X= '1' then
-			if INTA = '0' then
-				bl_int <= '1';
-			elsif h_cnt(4)= '1' then
-				bl_int <= not int_sig;
-			end if;
-		end if;
-	end process;
 
 --A <= std_logic_vector((not h_cnt(3)) & v_cnt(7 downto 6)) & std_logic_vector(v_cnt(2 downto 0)) & std_logic_vector(v_cnt(5 downto 3)) & std_logic_vector(h_cnt(8 downto 4));
 A <= std_logic_vector((not h_cnt(3)) & v_cnt(8 downto 7)) & std_logic_vector(v_cnt(3 downto 1)) & std_logic_vector(v_cnt(6 downto 4)) & std_logic_vector(h_cnt(8 downto 4));
