@@ -22,6 +22,7 @@ entity video is
 		TURBO 	: in std_logic := '0'; -- 1 = turbo mode, 0 = normal mode
 		INTA		: in std_logic := '0'; -- int request for turbo mode
 		INT		: out std_logic; -- int output
+		pFF_CS	: out std_logic; -- port FF select
 		ATTR_O	: out std_logic_vector(7 downto 0); -- attribute register output
 		A			: out std_logic_vector(13 downto 0); -- video address
 
@@ -40,6 +41,7 @@ entity video is
 		BUS_D 	: in std_logic_vector(7 downto 0);
 		BUS_WR_N : in std_logic;
 		GX0 		: out std_logic;
+		TV_VGA 	: in std_logic := '0'; -- 1 = TV mode, 0 = VGA mode
 		
 		HCNT : out std_logic_vector(9 downto 0);
 		VCNT : out std_logic_vector(8 downto 0);
@@ -77,6 +79,8 @@ architecture rtl of video is
 	signal hsync_profi : std_logic;
 	signal vsync_profi : std_logic;
 	signal blank_profi : std_logic;
+	signal pFF_CS_profi	: std_logic;
+	signal ATTR_O_profi	: std_logic_vector (7 downto 0);
 	
 	signal hcnt_profi : std_logic_vector(9 downto 0);
 	signal vcnt_profi : std_logic_vector(8 downto 0);
@@ -88,6 +92,8 @@ architecture rtl of video is
 	signal i_spec : std_logic;
 	signal hsync_spec : std_logic;
 	signal vsync_spec : std_logic;
+	signal pFF_CS_spec	: std_logic;
+	signal ATTR_O_spec	: std_logic_vector(7 downto 0);
 
 	signal hcnt_spec : std_logic_vector(9 downto 0);
 	signal vcnt_spec : std_logic_vector(8 downto 0);
@@ -101,16 +107,17 @@ begin
 	port map (
 		CLK => CLK, -- 14
 		CLK2x => CLK2x, -- 28
---		CLK2x => CLK, -- 28
 		ENA => ENA, -- 7
 		BORDER => BORDER(2 downto 0),
 		DI => DI,
 		TURBO => TURBO,
 		INTA => INTA,
 		INT => int_spec,
-		ATTR_O => ATTR_O, 
+		pFF_CS => pFF_CS_spec,
+		ATTR_O => ATTR_O_spec, 
 		A => vid_a_spec,
 		MODE60 => palette_en,
+		TV_VGA => TV_VGA,
 
 		RGB => rgb_spec,
 		I 	 => i_spec,
@@ -127,16 +134,19 @@ begin
 
 	U_PROFI: entity work.profi_video 
 	port map (
-		CLK => CLK, -- 14
-		CLK2x => CLK2x, -- 28
-		ENA => ENA, -- 7
+		CLK => CLK, -- 12
+		CLK2x => CLK2x, -- 24
+		ENA => ENA, -- 6
 		BORDER => BORDER,
 		DI => DI,
 		INTA => INTA,
 		INT => int_profi,
+		pFF_CS => pFF_CS_profi,
+		ATTR_O => ATTR_O_profi,
 		A => vid_a_profi,
 		DS80 => DS80,
 		MODE60 => palette_en,
+		TV_VGA => TV_VGA,
 
 		RGB => rgb_profi,
 		I 	 => i_profi,
@@ -159,6 +169,9 @@ begin
 	rgb <= rgb_profi when ds80 = '1' else rgb_spec;
 	i <= i_profi when ds80 = '1' else i_spec;
 
+	pFF_CS <= pFF_CS_profi when ds80 = '1' else pFF_CS_spec;
+	ATTR_O <= ATTR_O_profi when ds80 = '1' else ATTR_O_spec;
+	
 	HSYNC <= hsync_profi when ds80 = '1' else hsync_spec;
 	VSYNC <= vsync_profi when ds80 = '1' else vsync_spec;	
 	
@@ -200,7 +213,7 @@ begin
 	palette_grb <= palette(to_integer(unsigned(palette_a)));
 	
 	-- возвращаем наверх (top level) значение младшего разряда зеленого компонента палитры, это служит для отпределения наличия палитры в системе
-	GX0 <= palette_grb(6);
+	GX0 <= palette_grb(6) when ds80 = '1' else '1';
 	
 	-- применяем blank для профи, ибо в видеоконтроллере он после палитры
 	process(CLK2x, CLK, blank_profi, palette_grb, ds80) 

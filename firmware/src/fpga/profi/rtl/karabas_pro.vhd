@@ -100,7 +100,7 @@ port (
 	SND_DAT 		: out std_logic;
 	
 	-- Misc I/O
-	PIN_141		: inout std_logic;
+	PIN_141		: inout std_logic := '1';
 	PIN_138 		: inout std_logic;
 	PIN_121		: inout std_logic;
 	PIN_120		: inout std_logic;
@@ -176,6 +176,7 @@ signal vid_di_bus		: std_logic_vector(7 downto 0);
 signal vid_hsync		: std_logic;
 signal vid_vsync		: std_logic;
 signal vid_int			: std_logic;
+signal vid_pff_cs		: std_logic;
 signal vid_attr		: std_logic_vector(7 downto 0);
 signal vid_rgb			: std_logic_vector(8 downto 0);
 signal vid_rgb_osd 	: std_logic_vector(8 downto 0);
@@ -481,6 +482,7 @@ port map (
 	TURBO 			=> '0',
 	INTA 				=> cpu_inta_n,
 	INT 				=> cpu_int_n,
+	pFF_CS			=> vid_pff_cs, -- port FF select
 	ATTR_O 			=> vid_attr, 
 	A 					=> vid_a_bus,
 	
@@ -491,6 +493,7 @@ port map (
 	BUS_D 			=> cpu_do_bus,
 	BUS_WR_N 		=> cpu_wr_n,
 	GX0 				=> gx0,
+	TV_VGA			=> vid_scandoubler_enable,
 	
 	VIDEO_R 			=> vid_rgb(8 downto 6),
 	VIDEO_G 			=> vid_rgb(5 downto 3),
@@ -844,7 +847,8 @@ cpu_nmi_n <= '0' when kb_magic = '1' else '1'; -- NMI
 cpu_wait_n <= '1'; -- WAIT
 cpuclk <= clk_bus and ena_div8;
 
-vid_scandoubler_enable <= '0' when enable_switches and SW3(1) = '0' else '1'; -- enable scandoubler by default for older revisions and switchable by SW3(1) for a newer ones
+-- vid_scandoubler_enable <= '0' when enable_switches and ((SW3(1) = '0') or (PIN_141 = '0')) else '1'; -- enable scandoubler by default for older revisions and switchable by SW3(1) for a newer ones
+vid_scandoubler_enable <= PIN_141;
 audio_dac_type <= '0' when ((enable_switches and SW3(2) = '1') or (not(enable_switches) and dac_type = 0)) else '1'; -- default is dac_type for older revisions and switchable by SW3(2) for a newer ones
 ext_rom_bank <= not SW3(4 downto 3) when enable_switches else "00"; -- SW3 and SW4 switches a 4 external rom banks for newer revisions, otherwise - the only one ROM used 
 
@@ -1025,6 +1029,7 @@ begin
 		when x"0B" => cpu_di_bus <= ms_y;
 		when x"0C" => cpu_di_bus <= uart_do_bus;
 		when x"0D" => cpu_di_bus <= serial_ms_do_bus;
+--		when x"0E" => cpu_di_bus <= vid_attr;
 		when others => cpu_di_bus <= cpld_do;
 	end case;
 end process;
@@ -1044,15 +1049,16 @@ selector <=
 	x"0B" when (cpu_iorq_n = '0' and cpu_rd_n = '0' and cpu_a_bus = X"FFDF" and ms_present = '1' and cpm='0') else	-- Mouse0 port y 																
 	x"0C" when (cpu_iorq_n = '0' and cpu_rd_n = '0' and uart_oe_n = '0') else -- AY UART
 	x"0D" when (serial_ms_oe_n = '0') else -- Serial mouse
+--	x"0E" when (vid_pff_cs = '1' and cpu_iorq_n = '0' and cpu_a_bus( 7 downto 0) = X"FF") else -- Port FF select
 	(others => '1');
 	
 -- debug 
---PIN_141 <= vid_rgb(2);
---PIN_138 <= vid_rgb(5);
---PIN_121 <= vid_rgb(8);
---PIN_120 <= vid_hsync xor (not vid_vsync);
+-- PIN_141 <= 
+PIN_138 <= vid_rgb(5);
+PIN_121 <= vid_rgb(8);
+PIN_120 <= vid_hsync xor (not vid_vsync);
 PIN_119 <= cpu_int_n;
---PIN_115 <= VGA_VS;
+PIN_115 <= vid_rgb(2);
 
 -- временно включаем-выключаем палитру по кнопке ScrollLock. Потом сделаем включенной постоянно
 palette_en <= not kb_turbo;

@@ -13,12 +13,15 @@ entity profi_video is
 		CLK		: in std_logic; -- 12					
 		ENA		: in std_logic; -- 6
 		INTA		: in std_logic;
+		TV_VGA 	: in std_logic := '0'; -- 1 = TV mode, 0 = VGA mode
 		INT		: out std_logic;
 		BORDER	: in std_logic_vector(3 downto 0);	
 		A			: out std_logic_vector(13 downto 0);
 		DI			: in std_logic_vector(7 downto 0);
 		RGB		: out std_logic_vector(2 downto 0);	-- RGB
 		I 			: out std_logic;
+		pFF_CS	: out std_logic; -- port FF select
+		ATTR_O	: out std_logic_vector(7 downto 0);
 		BLANK 	: out std_logic;
 		HSYNC		: out std_logic;
 		VSYNC		: out std_logic;		
@@ -92,8 +95,6 @@ architecture rtl of profi_video is
 	signal v_sync			: std_logic;
 	signal int_sig			: std_logic;
 	signal blank_sig		: std_logic;
-	signal scan_cnt		: std_logic_vector(9 downto 0);
-	signal scan_cnt1		: std_logic_vector(9 downto 0);
 	signal rgbi				: std_logic_vector(3 downto 0);
 	signal bl_int 			: std_logic;
 	signal infp 			: std_logic;
@@ -121,11 +122,7 @@ begin
 						v_cnt <= v_cnt + 1;
 					end if;
 				end if;
-				if (h_cnt = pcpm_h_sync_on) then
-					scan_cnt1 <= (others => '0');
-				else
-					scan_cnt1 <= scan_cnt1 + 1;
-				end if;
+
 				if (v_cnt(9 downto 1) = pcpm_v_sync_on and mode60 = '0') or (v_cnt(9 downto 1) = pcpm_v_sync_on_60 and mode60 = '1') then
 					v_sync <= '0';
 				elsif (v_cnt(9 downto 1) = pcpm_v_sync_off and mode60 = '0') or (v_cnt(9 downto 1) = pcpm_v_sync_off_60 and mode60 = '1') then
@@ -211,6 +208,8 @@ A <= std_logic_vector((not h_cnt(3)) & v_cnt(8 downto 7)) & std_logic_vector(v_c
 blank_sig	<= '1' when (((h_cnt > pcpm_h_blk_on and h_cnt < pcpm_h_blk_off) or ((v_cnt(9 downto 1) > pcpm_v_blk_on and v_cnt(9 downto 1) < pcpm_v_blk_off and mode60 = '0') or (v_cnt(9 downto 1) > pcpm_v_blk_on_60 and v_cnt(9 downto 1) < pcpm_v_blk_off_60 and mode60 = '1')))) else '0';
 paper			<= '1' when ((h_cnt < pcpm_scr_h and v_cnt(9 downto 1) < pcpm_scr_v)) else '0';
 
+pFF_CS		<= paper;
+ATTR_O		<= attr_reg;
 INT			<= int_sig;
 RGB 			<= rgbi(3 downto 1);
 I 				<= rgbi(0);
