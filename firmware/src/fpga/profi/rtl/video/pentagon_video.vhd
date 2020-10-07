@@ -98,6 +98,8 @@ architecture rtl of pentagon_video is
 	signal v_sync			: std_logic;
 	signal int_sig			: std_logic;
 	signal blank_sig		: std_logic;
+	signal blank_h			: std_logic;
+	signal blank_v			: std_logic;
 	signal rgbi				: std_logic_vector(3 downto 0);
 	signal infp 			: std_logic;
 	signal selector 		: std_logic_vector(2 downto 0);
@@ -119,16 +121,16 @@ begin
 						end if;
 			
 						if (h_cnt = spec_h_sync_on) then
-							if (v_cnt(9 downto 1) = spec_v_end and mode60 = '0') or (v_cnt(9 downto 1) = spec_v_end_60 and mode60 = '1') then
+							if (v_cnt = spec_v_end and mode60 = '0') or (v_cnt = spec_v_end_60 and mode60 = '1') then
 								v_cnt <= (others => '0');
 							else
 								v_cnt <= v_cnt + 1;
 							end if;
 						end if;
 				
-						if (v_cnt(9 downto 1) = spec_v_sync_on and mode60 = '0') or (v_cnt(9 downto 1) = spec_v_sync_on_60 and mode60 = '1') then
+						if (v_cnt = spec_v_sync_on and mode60 = '0') or (v_cnt = spec_v_sync_on_60 and mode60 = '1') then
 							v_sync <= '0';
-						elsif (v_cnt(9 downto 1) = spec_v_sync_off and mode60 = '0') or (v_cnt(9 downto 1) = spec_v_sync_off_60 and mode60 = '1') then
+						elsif (v_cnt = spec_v_sync_off and mode60 = '0') or (v_cnt = spec_v_sync_off_60 and mode60 = '1') then
 							v_sync <= '1';
 						end if;
 
@@ -139,12 +141,13 @@ begin
 						end if;
 
 						--Int
-						if (h_cnt = spec_h_int_on  and v_cnt(9 downto 1) = spec_v_int_on and v_cnt(0) = '0') then
+						if (h_cnt = spec_h_int_on  and v_cnt = spec_v_int_on) then
 							int_sig <= '0';
-						elsif (h_cnt = spec_h_int_off and v_cnt(9 downto 1) = spec_v_int_off and v_cnt(0) = '1') then
+						elsif (h_cnt = 383 and v_cnt = 240) then
 							int_sig <= '1';
 						end if;
 					end if;
+					
 				else -- VGA
 				
 					if (h_cnt = spec_h_end) then
@@ -236,24 +239,43 @@ begin
 	end if;
 end process;
 
-	A <= 
-		-- data address
-		std_logic_vector( '0' & v_cnt(8 downto 7)) & std_logic_vector(v_cnt(3 downto 1)) & std_logic_vector(v_cnt(6 downto 4)) & std_logic_vector(h_cnt(7 downto 3)) when VBUS_MODE = '1' and VID_RD = '0' else 
-		-- standard attribute address
-		std_logic_vector( '0' & "110" & v_cnt(8 downto 4) & h_cnt(7 downto 3));
+process (TV_VGA, VBUS_MODE, VID_RD, v_cnt, h_cnt)
+begin
+	if TV_VGA = '0' then
+		if VBUS_MODE = '1' and VID_RD = '0' then
+			A <= std_logic_vector( '0' & v_cnt(8 downto 7)) & std_logic_vector(v_cnt(3 downto 1)) & std_logic_vector(v_cnt(6 downto 4)) & std_logic_vector(h_cnt(7 downto 3)); -- data address
+		else
+			A <= std_logic_vector( '0' & "110" & v_cnt(8 downto 4) & h_cnt(7 downto 3));	-- standard attribute address
+		end if;
+	else
+		if VBUS_MODE = '1' and VID_RD = '0' then
+			A <= std_logic_vector( '0' & v_cnt(7 downto 6)) & std_logic_vector(v_cnt(2 downto 0)) & std_logic_vector(v_cnt(5 downto 3)) & std_logic_vector(h_cnt(7 downto 3)); -- data address
+		else
+			A <= std_logic_vector( '0' & "110" & v_cnt(7 downto 3) & h_cnt(7 downto 3));	-- standard attribute address
+		end if;	
+	end if;	
+end process;
 
-blank_sig	<= '1' when (((h_cnt > spec_h_blk_on and h_cnt < spec_h_blk_off) or ((v_cnt(9 downto 1) > spec_v_blk_on and v_cnt(9 downto 1) < spec_v_blk_off and mode60 = '0') or (v_cnt(9 downto 1) > spec_v_blk_on_60 and v_cnt(9 downto 1) < spec_v_blk_off_60 and mode60 = '1')))) else '0';
-paper			<= '1' when ((h_cnt < spec_scr_h and v_cnt(9 downto 1) < spec_scr_v)) else '0';
+blank_sig	<= '1' when (((h_cnt > spec_h_blk_on and h_cnt < spec_h_blk_off) or
+								((v_cnt(9 downto 1) > spec_v_blk_on and v_cnt(9 downto 1) < spec_v_blk_off and mode60 = '0') or
+								(v_cnt(9 downto 1) > spec_v_blk_on_60 and v_cnt(9 downto 1) < spec_v_blk_off_60 and mode60 = '1'))) and TV_VGA = '0') or	-- VGA Blank
+
+								(((h_cnt > spec_h_blk_on and h_cnt < spec_h_blk_off) or
+								((v_cnt > spec_v_blk_on and v_cnt < spec_v_blk_off and mode60 = '0') or
+								(v_cnt > spec_v_blk_on_60 and v_cnt < spec_v_blk_off_60 and mode60 = '1'))) and TV_VGA = '1') else '0';	-- TV Blank
+
+paper			<= '1' when ((h_cnt < spec_scr_h and v_cnt(9 downto 1) < spec_scr_v) and TV_VGA = '0') or	-- VGA Paper
+								((h_cnt < spec_scr_h and v_cnt < spec_scr_v) and TV_VGA = '1') else '0';		-- TV Paper
 
 pFF_CS		<= paper;
 ATTR_O		<= attr_reg;
 INT			<= int_sig;
 RGB 			<= rgbi(3 downto 1);
 I 				<= rgbi(0);
-HSYNC 		<= h_sync;
+HSYNC 		<= h_sync when TV_VGA = '0' else (h_sync xor (not v_sync));
 VSYNC 		<= v_sync;
 HCNT <= '0' & std_logic_vector(h_cnt);
-VCNT <= std_logic_vector(v_cnt(9 downto 1));
+VCNT <= std_logic_vector(v_cnt(9 downto 1)) when TV_VGA = '0' else std_logic_vector(v_cnt(8 downto 0));
 BLANK <= blank1;
 
 end architecture;
