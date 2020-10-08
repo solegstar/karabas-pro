@@ -31,9 +31,18 @@ entity cpld_kbd is
 	 RTC_WR_N 	: in std_logic := '1';
 	 RTC_INIT 	: in std_logic := '0';
 	 
+	 LED1			: in std_logic := '0';
+	 LED2 		: in std_logic := '0';
+	 LED1_OWR	: in std_logic := '0';
+	 LED2_OWR 	: in std_logic := '0';
+	 
+	 SOFT_SW1 	: out std_logic := '0';
+	 SOFT_SW2 	: out std_logic := '0';
+	 
 	 RESET		: out std_logic := '0';
 	 TURBO		: out std_logic := '0';
 	 MAGICK		: out std_logic := '0';
+	 WAIT_CPU 	: out std_logic := '0';
 	 
 	 JOY			: out std_logic_vector(4 downto 0) := "00000"
 	 
@@ -94,10 +103,11 @@ architecture RTL of cpld_kbd is
 	signal queue_do			: std_logic_vector(15 downto 0);
 	signal queue_rd_empty   : std_logic;
 	
-	signal last_queue_di 	: std_logic_vector(15 downto 0) := (others => '1');
+	signal last_queue_di 	: std_logic_vector(15 downto 0) := (others => '1');	
+	signal cnt_led 			: unsigned(12 downto 0) := "0000000000000";
 	 
 begin
-
+	
 	U_SPI: entity work.spi_slave
 	generic map(
 			N             => 16 -- 2 bytes (cmd + data)       
@@ -140,7 +150,11 @@ begin
 									  RESET <= spi_do(1);
 									  TURBO <= spi_do(2);
 									  MAGICK <= spi_do(3);
-
+									  -- is_up <= spi_do(4);
+									  WAIT_CPU <= spi_do(5);
+									  SOFT_SW1 <= spi_do(6);
+									  SOFT_SW2 <= spi_do(7);
+					-- when X"07", X"08" - scancode
 					-- mouse data
 					when X"0A" => mouse_x(7 downto 0) <= signed(spi_do(7 downto 0));
 					when X"0B" => mouse_y(7 downto 0) <= signed(spi_do(7 downto 0));
@@ -288,7 +302,7 @@ begin
 		q			 => rtcr_do
 	);
 	
-	-- fifo for rtc write commands to send them on avr side 
+	-- fifo for write commands to send them on avr side 
 	UFIFO: entity work.queue 
 	port map (
 		data 		=> queue_di,
@@ -317,7 +331,7 @@ begin
 		end case;
 	end process;
 		
-	process(CLK, N_RESET, RTC_INIT, queue_wr_full, RTC_WR_N, RTC_CS, rtc_cmd, rtc_data)
+	process(CLK, N_RESET, RTC_INIT, queue_wr_full, RTC_WR_N, RTC_CS, rtc_cmd, rtc_data, led1, led2, led1_OWR, led2_OWR, queue_wr_req)
 	begin
 		if CLK'event and CLK = '1' then
 
@@ -335,7 +349,8 @@ begin
 			if N_RESET='0' then
 				a_reg <= "00100110";
 				b_reg <= (others => '0');
-				c_reg <= (others => '0');				
+				c_reg <= (others => '0');		
+				cnt_led <= (others => '0');
 			else 
 			
 				-- RTC register set by ZX
@@ -362,25 +377,38 @@ begin
 						last_queue_di <= "10" & RTC_A & RTC_DI;
 						queue_wr_req <= '1';
 					end if;
+					
+				else
 				
-				-- RTC incoming time from atmega (every seconds)
-				elsif rtc_cmd(7 downto 6) = "01" then 
-					rtcw_wr <= '1';
-					rtcw_a <= rtc_cmd(5 downto 0);
-					case rtc_cmd(5 downto 0) is 
-						when "000000" => rtcw_di <= "00" & rtc_data(5 downto 0);     -- seconds
-						when "000010" => rtcw_di <= "00" & rtc_data(5 downto 0);		 -- minutes
-						when "000100" => rtcw_di <= "000" & rtc_data(4 downto 0);	 -- hours
-						when "000110" => rtcw_di <= "00000" & rtc_data(2 downto 0);	 -- weeks
-						when "000111" => rtcw_di <= "000" & rtc_data(4 downto 0);	 -- days
-						when "001000" => rtcw_di <= "0000" & rtc_data(3 downto 0);	 -- month
-						when "001001" => rtcw_di <= '0' & rtc_data(6 downto 0);		 -- year
-						when others   => rtcw_di <= rtc_data;
-					end case;
-				else 
-					rtcw_wr <= '0';
+					-- RTC incoming time from atmega (every seconds)
+					if rtc_cmd(7 downto 6) = "01" then 
+						rtcw_wr <= '1';
+						rtcw_a <= rtc_cmd(5 downto 0);
+						case rtc_cmd(5 downto 0) is 
+							when "000000" => rtcw_di <= "00" & rtc_data(5 downto 0);     -- seconds
+							when "000010" => rtcw_di <= "00" & rtc_data(5 downto 0);		 -- minutes
+							when "000100" => rtcw_di <= "000" & rtc_data(4 downto 0);	 -- hours
+							when "000110" => rtcw_di <= "00000" & rtc_data(2 downto 0);	 -- weeks
+							when "000111" => rtcw_di <= "000" & rtc_data(4 downto 0);	 -- days
+							when "001000" => rtcw_di <= "0000" & rtc_data(3 downto 0);	 -- month
+							when "001001" => rtcw_di <= '0' & rtc_data(6 downto 0);		 -- year
+							when others   => rtcw_di <= rtc_data;
+						end case;
+					else 
+						rtcw_wr <= '0';
+					end if;
+					
+					cnt_led <= cnt_led + 1;
+					
+					-- sending led status on every 256th tick
+					if queue_wr_full = '0' and cnt_led = "0000000000000" then 
+						queue_di <= x"0E" & "0000" & LED2_OWR & LED1_OWR & LED2 & LED1;
+						queue_wr_req <= '1';
+					end if;
+					
 				end if;
 			end if;
+			
 		end if;
 	end process;
 

@@ -53,6 +53,8 @@
 
 #define EEPROM_TURBO_ADDRESS 0x00
 #define EEPROM_MODE_ADDRESS 0x01
+#define EEPROM_SW1_ADDRESS 0x02
+#define EEPROM_SW2_ADDRESS 0x03
 #define EEPROM_RTC_OFFSET 0x10
 
 #define EEPROM_VALUE_TRUE 10
@@ -62,15 +64,25 @@ PS2KeyRaw kbd;
 PS2Mouse mouse(PIN_MOUSE_CLK, PIN_MOUSE_DAT);
 static DS1307 rtc;
 
-bool matrix[ZX_MATRIX_SIZE]; // matrix of pressed keys + mouse reports to be transmitted on CPLD side by simple serial protocol
+bool matrix[ZX_MATRIX_FULL_SIZE]; // matrix of pressed keys + mouse reports to be transmitted on CPLD side by simple serial protocol
 bool joy[6]; // joystic states
 bool profi_mode = true; // false = zx spectrum mode (switched by PrtSrc button in run-time)
 bool is_turbo = false; // turbo toggle (switched by ScrollLock button)
+bool is_sw1 = false; // SW1 state
+bool is_sw2 = false; // SW2 state
+bool is_wait = false; // wait mode
 bool mouse_present = false; // mouse present flag (detected by signal change on CLKM pin)
 bool blink_state = false;
 bool flags_changed = false; // changed flags is_turbo / profi_mode
 
+bool led1_state = false;
+bool led2_state = false;
+bool led1_overwrite = false;
+bool led2_overwrite = false;
+
 unsigned long t = 0;  // current time
+unsigned long tl1 = 0; // led1 time
+unsigned long tl2 = 0; // led1 time
 unsigned long tm = 0; // mouse poll time
 unsigned long tl = 0; // blink poll time
 unsigned long tr = 0; // rtc poll time
@@ -113,7 +125,7 @@ void fill_kbd_matrix(int sc)
 {
 
   static bool is_up=false, is_e=false, is_e1=false;
-  static bool is_ctrl=false, is_alt=false, is_del=false, is_bksp = false, is_shift = false, is_esc = false, is_ss_used = false, is_cs_used = false;
+  static bool is_ctrl=false, is_alt=false, is_del=false, is_win = false, is_menu = false, is_bksp = false, is_shift = false, is_esc = false, is_ss_used = false, is_cs_used = false;
   static int scancode = 0;
 
   // is extended scancode prefix
@@ -203,6 +215,17 @@ void fill_kbd_matrix(int sc)
         matrix[ZX_K_C] =  !is_up;
       }
       is_del = !is_up;
+    break;
+
+    // Win
+    case PS2_L_WIN:
+    case PS2_R_WIN:
+      is_win = !is_up;
+    break;
+
+    // Menu
+    case PS2_MENU:
+      is_menu = !is_up;
     break;
 
     // Ins -> O+b6 for Profi, SS+A for ZX
@@ -526,8 +549,28 @@ void fill_kbd_matrix(int sc)
 
 
     // Fn keys
-    case PS2_F1: matrix[ZX_K_A] = !is_up; matrix[ZX_K_BIT6] = !is_up; break;
-    case PS2_F2: matrix[ZX_K_B] = !is_up; matrix[ZX_K_BIT6] = !is_up; break;
+    case PS2_F1:
+      if (is_menu) {
+        if (!is_up) {
+          // menu + F1 = SW1
+          is_sw1 = !is_sw1;
+          eeprom_store_value(EEPROM_SW1_ADDRESS, is_sw1);
+          matrix[ZX_K_SW1] = is_sw1;
+        }
+      } else {
+        matrix[ZX_K_A] = !is_up; matrix[ZX_K_BIT6] = !is_up; break;
+      }    
+    case PS2_F2: 
+      if (is_menu) {
+        if (!is_up) {
+          // menu + F2 = SW2
+          is_sw2 = !is_sw2;
+          eeprom_store_value(EEPROM_SW2_ADDRESS, is_sw2);
+          matrix[ZX_K_SW2] = is_sw2;
+        }
+      } else {
+        matrix[ZX_K_B] = !is_up; matrix[ZX_K_BIT6] = !is_up; break;
+      }
     case PS2_F3: matrix[ZX_K_C] = !is_up; matrix[ZX_K_BIT6] = !is_up; break;
     case PS2_F4: matrix[ZX_K_D] = !is_up; matrix[ZX_K_BIT6] = !is_up; break;
     case PS2_F5: matrix[ZX_K_E] = !is_up; matrix[ZX_K_BIT6] = !is_up; break;
@@ -536,15 +579,34 @@ void fill_kbd_matrix(int sc)
     case PS2_F8: matrix[ZX_K_H] = !is_up; matrix[ZX_K_BIT6] = !is_up; break;
     case PS2_F9: matrix[ZX_K_I] = !is_up; matrix[ZX_K_BIT6] = !is_up; break;
     case PS2_F10: matrix[ZX_K_J] = !is_up; matrix[ZX_K_BIT6] = !is_up; break;
-    case PS2_F11: matrix[ZX_K_Q] = !is_up; matrix[ZX_K_SS] = !is_up; break;
-    case PS2_F12: matrix[ZX_K_W] = !is_up; matrix[ZX_K_SS] = !is_up; break;
+    case PS2_F11: 
+      if (is_menu) {
+        if (!is_up) {
+          // menu + F11 = turbo
+          is_turbo = !is_turbo;
+          eeprom_store_value(EEPROM_TURBO_ADDRESS, is_turbo);
+          matrix[ZX_K_TURBO] = is_turbo;
+        }
+      } else {
+        matrix[ZX_K_Q] = !is_up; matrix[ZX_K_SS] = !is_up; 
+      }
+    break;
+    case PS2_F12: 
+      if (is_menu) {
+        if (!is_up) {
+          // menu + F12 = magic
+          do_magic();
+        }
+      } else {
+        matrix[ZX_K_W] = !is_up; matrix[ZX_K_SS] = !is_up; 
+      }
+    break;
 
-    // Scroll Lock -> Turbo
-    case PS2_SCROLL: 
+    // Scroll Lock -> Wait
+    case PS2_SCROLL:
       if (is_up) {
-        is_turbo = !is_turbo;
-        eeprom_store_value(EEPROM_TURBO_ADDRESS, is_turbo);
-        matrix[ZX_K_TURBO] = is_turbo;
+        is_wait = !is_wait;
+        matrix[ZX_K_WAIT] = is_wait; 
       }
     break;
 
@@ -573,7 +635,7 @@ void fill_kbd_matrix(int sc)
     is_del = false;
     is_shift = false;
     is_ss_used = false;
-    is_cs_used = false;    
+    is_cs_used = false; 
     do_reset();
   }
   //digitalWrite(PIN_RESET, (is_ctrl && is_alt && is_del) ? LOW : HIGH);
@@ -648,7 +710,7 @@ uint8_t get_matrix_byte(uint8_t pos)
   uint8_t result = 0;
   for (uint8_t i=0; i<8; i++) {
     uint8_t k = pos*8 + i;
-    if (k < ZX_MATRIX_SIZE) {
+    if (k < ZX_MATRIX_FULL_SIZE) {
       bitWrite(result, i, matrix[k]);
     }
   }
@@ -797,6 +859,13 @@ void process_in_cmd(uint8_t cmd, uint8_t data)
 //    rtc_send_all();
 //    rtc_init_done = true;
 //  }
+
+  if (cmd == CMD_LED_WRITE) {
+    led1_state = bitRead(data, 0);
+    led2_state = bitRead(data, 1);
+    led1_overwrite = bitRead(data, 2);
+    led2_overwrite = bitRead(data, 3);
+  }
   
   if (cmd >= CMD_RTC_WRITE && cmd < CMD_RTC_WRITE+64) {
     // write rtc register
@@ -914,14 +983,20 @@ void eeprom_restore_values()
 {
   is_turbo = eeprom_restore_value(EEPROM_TURBO_ADDRESS, is_turbo);
   profi_mode = eeprom_restore_value(EEPROM_MODE_ADDRESS, profi_mode);
+  is_sw1 = eeprom_restore_value(EEPROM_SW1_ADDRESS, is_sw1);
+  is_sw2 = eeprom_restore_value(EEPROM_SW2_ADDRESS, is_sw2);
   // apply restored values
   matrix[ZX_K_TURBO] = is_turbo;
+  matrix[ZX_K_SW1] = is_sw1;
+  matrix[ZX_K_SW2] = is_sw2;
 }
 
 void eeprom_store_values()
 {
   eeprom_store_value(EEPROM_TURBO_ADDRESS, is_turbo);
   eeprom_store_value(EEPROM_MODE_ADDRESS, profi_mode);
+  eeprom_store_value(EEPROM_SW1_ADDRESS, is_sw1);
+  eeprom_store_value(EEPROM_SW2_ADDRESS, is_sw2);  
 }
 
 void checkSerialInput()
@@ -1069,7 +1144,7 @@ void setup()
   pinMode(PIN_JOY_FIRE2, INPUT_PULLUP);
   
   // clear full matrix
-  clear_matrix(ZX_MATRIX_SIZE);
+  clear_matrix(ZX_MATRIX_FULL_SIZE);
 
   // restore saved modes from EEPROM
   eeprom_restore_values();
@@ -1142,7 +1217,9 @@ void loop()
     int c = kbd.read();
     blink_state = true;
     tl = n;
-    digitalWrite(PIN_LED1, HIGH);
+    if (!led1_overwrite) {
+      digitalWrite(PIN_LED1, HIGH);
+    }
 #if DEBUG_MODE    
     Serial.print(F("Scancode: "));
     Serial.println(c, HEX);
@@ -1178,7 +1255,9 @@ void loop()
   joy[ZX_JOY_FIRE2] = digitalRead(PIN_JOY_FIRE2) == LOW;
 
   if (joy[0] || joy[1] || joy[2] || joy[3] || joy[4] || joy[5]) {
-    digitalWrite(PIN_LED1, HIGH);
+    if (!led1_overwrite) {
+      digitalWrite(PIN_LED1, HIGH);
+    }
     blink_state = true;
     tl = n;
   }
@@ -1187,7 +1266,9 @@ void loop()
   transmit_joy_data();
 
   if (n - tl >= 200) {
-    digitalWrite(PIN_LED1, LOW);
+    if (!led1_overwrite) {
+      digitalWrite(PIN_LED1, LOW);
+    }
     blink_state = false;
   }
 
@@ -1265,5 +1346,31 @@ void loop()
   }
 
   checkSerialInput();
+
+  // control led1
+  if (led1_overwrite) {
+    if (led1_state == 1) {
+      digitalWrite(PIN_LED1, HIGH);
+    }
+    if (n - tl1 >= 100) {
+      tl1 = n;
+      if (led1_state == false) {
+        digitalWrite(PIN_LED1, LOW);
+      }
+    }
+  }
+
+  // control led2
+  if (led2_overwrite) {
+    if (led2_state == 1) {
+      digitalWrite(PIN_LED2, HIGH);
+    }
+    if (n - tl2 >= 100) {
+      tl2 = n;
+      if (led2_state == false) {
+        digitalWrite(PIN_LED2, LOW);
+      }
+    }
+  }
   
 }
