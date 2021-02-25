@@ -516,14 +516,16 @@ port map (
 	c3 				=> clk_24,
 	c4 				=> clk_8);
 		
--- main clock selector
-U3: entity work.clk_ctrl
-port map(
-	clkselect 	=> ds80,
-	inclk0x 		=> clk_28,
-	inclk1x 		=> clk_24,
-	outclk 		=> clk_bus
-);
+---- main clock selector
+--U3: entity work.clk_ctrl
+--port map(
+--	clkselect 	=> ds80,
+--	inclk0x 		=> clk_28,
+--	inclk1x 		=> clk_28,
+--	outclk 		=> clk_bus
+--);
+
+clk_bus <= clk_28;
 
 -- Bus Port clock selector
 U4: entity work.clk_ctrl2
@@ -678,7 +680,7 @@ port map (
 	CLK 				=> clk_div2,
 	CLK2 				=> clk_bus,
 	EN 				=> vid_scandoubler_enable,
-	DS80				=> ds80,		
+	DS80				=> '0',		
 	RGB_O(8 downto 6)	=> VGA_R,
 	RGB_O(5 downto 3)	=> VGA_G,
 	RGB_O(2 downto 0)	=> VGA_B,
